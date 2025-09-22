@@ -3,140 +3,142 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Облако слов от пользователей</title>
+  <title>Облако слов — что вы думаете?</title>
 
-  <!-- Подключаем D3.js и d3-cloud -->
+  <!-- D3.js и d3-cloud -->
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-cloud@1.2.5/build/d3.layout.cloud.min.js"></script>
 
   <style>
     body {
-      font-family: 'Arial', sans-serif;
       margin: 0;
-      padding: 20px;
-      background-color: #f9f9f9;
-      color: #333;
+      padding: 0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      color: white;
       text-align: center;
+      min-height: 100vh;
     }
     h1 {
-      color: #2c3e50;
+      font-size: 2.5em;
+      margin: 30px 0 10px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     p.lead {
-      font-size: 1.1em;
+      font-size: 1.2em;
       max-width: 600px;
-      margin: 10px auto;
+      margin: 10px auto 20px;
+      opacity: 0.9;
     }
     .form-link {
       display: inline-block;
-      margin: 20px 0;
-      padding: 12px 24px;
-      background-color: #3498db;
+      padding: 14px 28px;
+      background: #ff6b6b;
       color: white;
       text-decoration: none;
-      border-radius: 6px;
+      border-radius: 50px;
       font-weight: bold;
-      font-size: 16px;
+      font-size: 18px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      transition: transform 0.2s, box-shadow 0.2s;
     }
     .form-link:hover {
-      background-color: #2980b9;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 15px rgba(0,0,0,0.3);
     }
     button#refresh {
-      padding: 10px 20px;
+      padding: 12px 24px;
       font-size: 16px;
-      background-color: #2ecc71;
+      background-color: #f39c12;
       color: white;
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      margin-top: 10px;
+      margin-top: 15px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+      transition: background 0.3s;
     }
     button#refresh:hover {
-      background-color: #27ae60;
-    }
-    svg {
-      border: 1px solid #ddd;
-      background: white;
-      margin: 20px auto;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      background-color: #e67e22;
     }
     .loading {
-      color: #7f8c8d;
+      color: #ecf0f1;
       font-style: italic;
-      margin: 10px 0;
+      margin: 20px 0;
+      font-size: 1.1em;
+    }
+    svg {
+      display: block;
+      margin: 20px auto;
+      width: 90%;
+      max-width: 1000px;
+      height: 600px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+    }
+    text {
+      transition: opacity 0.5s ease, transform 0.3s ease;
     }
   </style>
 </head>
 <body>
-  <h1>Облако слов: что вы думаете?</h1>
-  <p class="lead">Пройдите короткую форму — ваш ответ станет частью общего облака слов!</p>
+  <h1>☁️ Облако слов из ваших ответов</h1>
+  <p class="lead">Пройдите форму — ваше слово станет частью общего облака!</p>
   <a href="https://docs.google.com/forms/d/e/1FAIpQLSc6SUsLHNuJ6gSkoaaojPnDuYbZMnftZwYp_livh25zJcAn8A/viewform?usp=header" target="_blank" class="form-link">Пройти форму</a>
-
   <button id="refresh">🔄 Обновить облако</button>
   <p class="loading" id="status">Загрузка данных...</p>
-
   <svg width="960" height="600"></svg>
 
   <script>
-    // 🔁 Замените на ваш URL из Google Apps Script
     const GAS_JSONP_URL = "https://script.google.com/macros/s/AKfycbyLQ2achxsI5EL8HXtFJGUlB0yeQeaSCGcgu6OD74eMFVGYUpuUard90yRey6I15BYX/exec";
-
-    // Элементы DOM
     const statusText = document.getElementById("status");
     const svg = d3.select("svg");
     const g = svg.append("g").attr("transform", "translate(480,300)");
 
-    // Кнопка обновления
     document.getElementById("refresh").addEventListener("click", loadFromGoogleSheets);
 
     // Загрузить при запуске
     loadFromGoogleSheets();
 
-    // Функция загрузки через JSONP
     function loadFromGoogleSheets() {
-      // Очистка предыдущего состояния
       statusText.textContent = "Загрузка данных...";
       g.selectAll("*").remove();
-
-      // Удаляем старый тег script, если есть
       const oldScript = document.getElementById("jsonp-script");
       if (oldScript) oldScript.remove();
 
-      // Динамически добавляем скрипт
       const script = document.createElement("script");
       script.id = "jsonp-script";
       script.src = `${GAS_JSONP_URL}?callback=handleData`;
       script.onerror = () => {
-        statusText.textContent = "Ошибка загрузки данных. Попробуйте позже.";
+        statusText.textContent = "Ошибка загрузки данных.";
       };
       document.body.appendChild(script);
     }
 
-    // Колбэк, вызываемый после получения данных
     function handleData(data) {
       const script = document.getElementById("jsonp-script");
-      if (script) script.remove(); // удаляем после выполнения
+      if (script) script.remove();
 
       if (!data || data.length === 0) {
-        statusText.textContent = "Пока нет ни одного ответа. Пройдите форму!";
+        statusText.textContent = "Пока нет ответов. Будьте первым!";
         return;
       }
 
       if (data.error) {
-        console.error("Ошибка от сервера:", data);
-        statusText.textContent = "Ошибка: " + data.message;
+        console.error("Ошибка:", data.message);
+        statusText.textContent = "Не удалось загрузить данные.";
         return;
       }
 
       try {
-        // Извлекаем текст из колонки (подставьте правильное имя)
-        // Обычно первая колонка — временная метка, вторая — ответ
-        const firstRow = data[0];
-        const keys = Object.keys(firstRow);
-        const textColumn = keys[keys.length - 1]; // последняя колонка — скорее всего ответ
+        const keys = Object.keys(data[0] || {});
+        const textColumn = keys.length > 1 ? keys[keys.length - 1] : keys[0];
 
         const allText = data.map(row => row[textColumn] || "").join(" ");
-
         const words = extractWords(allText);
+
         if (words.length === 0) {
           statusText.textContent = "Нет подходящих слов для отображения.";
           return;
@@ -145,65 +147,83 @@
         generateWordCloud(words);
         statusText.textContent = `Показано ${Math.min(words.length, 100)} слов.`;
       } catch (err) {
-        console.error("Ошибка обработки данных:", err);
-        statusText.textContent = "Ошибка анализа данных.";
+        console.error("Ошибка обработки:", err);
+        statusText.textContent = "Ошибка анализа текста.";
       }
     }
 
-    // Извлечение и подсчёт частоты слов
     function extractWords(text) {
       const cleanText = text
         .toLowerCase()
-        .replace(/[^\w\sа-яё-]/gi, ' ') // заменяем пунктуацию на пробелы
+        .replace(/[^\w\sа-яё-]/gi, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 
-      const words = cleanText.split(/\s+/).filter(w => w.length > 2);
-
-      // Стоп-слова (можно расширить)
       const stopWords = new Set([
-        'и', 'в', 'на', 'с', 'к', 'у', 'по', 'но', 'а', 'я', 'мы', 'вы', 'он', 'она',
-        'они', 'это', 'тот', 'так', 'как', 'же', 'ли', 'бы', 'что', 'который'
+        'и', 'в', 'на', 'с', 'к', 'у', 'по', 'но', 'а', 'я', 'мы', 'вы', 'он', 'она', 'они',
+        'это', 'тот', 'так', 'как', 'же', 'ли', 'бы', 'что', 'который', 'если', 'или'
       ]);
 
       const freq = {};
-      words.forEach(word => {
-        if (!stopWords.has(word)) {
+      cleanText.split(/\s+/)
+        .filter(w => w.length > 2 && !stopWords.has(w))
+        .forEach(word => {
           freq[word] = (freq[word] || 0) + 1;
-        }
-      });
+        });
 
-      // Преобразуем в массив и сортируем по частоте
+      // 🔥 Главное: размер прямо пропорционален частоте!
+      const maxSize = 100; // максимальный возможный размер
+      const maxFreq = Math.max(...Object.values(freq));
+      const scale = d3.scaleLinear()
+        .domain([1, maxFreq])
+        .range([20, maxSize]); // минимальный размер — 20px
+
       return Object.entries(freq)
-        .map(([text, count]) => ({ text, size: Math.max(10, count * 10) }))
+        .map(([text, count]) => ({
+          text,
+          size: scale(count), // ✅ Прямая пропорция!
+          frequency: count
+        }))
         .sort((a, b) => b.size - a.size)
-        .slice(0, 100); // максимум 100 слов
+        .slice(0, 100);
     }
 
-    // Генерация облака слов
     function generateWordCloud(words) {
-      g.selectAll("*").remove(); // очистить
+      g.selectAll("*").remove();
+
+      // Цветовая шкала по размеру
+      const colorScale = d3.scaleSequential(d3.interpolateViridis)
+        .domain(d3.extent(words, d => d.size));
 
       d3.layout.cloud()
         .size([960, 600])
         .words(words)
-        .padding(3)
-        .rotate(() => 0) // все слова горизонтально
+        .padding(2)
+        .rotate(() => 0)
         .font("Impact")
         .fontSize(d => d.size)
         .on("end", draw)
         .start();
 
       function draw(words) {
-        g.selectAll("text")
+        const texts = g.selectAll("text")
           .data(words)
           .enter().append("text")
           .style("font-size", d => d.size + "px")
           .style("font-family", "Impact")
-          .style("fill", () => d3.interpolateSinebow(Math.random()))
+          .style("fill", d => colorScale(d.size))
+          .style("text-shadow", "2px 2px 4px rgba(0,0,0,0.5)")
           .attr("text-anchor", "middle")
           .attr("transform", d => `translate(${d.x},${d.y})`)
-          .text(d => d.text);
+          .text(d => d.text)
+          .style("opacity", 0)
+          .transition()
+          .duration(800)
+          .style("opacity", 1);
+
+        // Подсказка при наведении
+        texts.append("title")
+          .text(d => `"${d.text}" — встречается ${d.frequency} раз`);
       }
     }
   </script>
