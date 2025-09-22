@@ -210,8 +210,10 @@
           .data(words)
           .enter().append("text")
           .style("font-size", d => d.size + "px")
-          .style("font-family", "Impact")
+          .style("font-family", "Arial") // лучше читается
           .style("fill", d => colorScale(d.size))
+          .style("stroke", "white")
+          .style("stroke-width", 2)
           .style("text-shadow", "2px 2px 4px rgba(0,0,0,0.5)")
           .attr("text-anchor", "middle")
           .attr("transform", d => `translate(${d.x},${d.y})`)
