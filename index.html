@@ -35,26 +35,29 @@
   <svg width="960" height="600"></svg>
 
   <script>
-    // Загружаем слова из JSON
     d3.json("words.json")
       .then(function(words) {
         document.querySelector(".loading").textContent = "Генерация облака...";
 
-        // Настройка layout
+        const width = 960;
+        const height = 600;
+
         const layout = d3.layout.cloud()
-          .size([960, 600])
+          .size([width, height])
           .words(words.map(d => Object.create(d)))
           .padding(3)
           .rotate(() => Math.random() > 0.5 ? 90 : 0)
           .font("Impact")
-          .fontSize(d => d.value * 5) // масштабируем значение
-          .on("end", draw)
+          .fontSize(d => d.value * 5)
+          .on("end", function(finishedWords) {
+            draw(finishedWords, width, height);
+          })
           .start();
 
-        function draw(words) {
+        function draw(words, w, h) {
           const svg = d3.select("svg");
           const g = svg.append("g")
-            .attr("transform", "translate(" + layout.size()[0]/2 + "," + layout.size()[1]/2 + ")");
+            .attr("transform", `translate(${w/2},${h/2})`);
 
           g.selectAll("text")
             .data(words)
@@ -70,7 +73,7 @@
         }
       })
       .catch(err => {
-        document.querySelector(".loading").textContent = "Ошибка загрузки слов: " + err;
+        document.querySelector(".loading").textContent = "Ошибка загрузки слов: " + err.message;
         console.error(err);
       });
   </script>
