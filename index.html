@@ -2,105 +2,180 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Облако слов — что вы думаете?</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Облако слов</title>
+
+  <!-- Подключаем Google Font: Open Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@600;700&display=swap" rel="stylesheet" />
 
   <!-- D3.js и d3-cloud -->
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-cloud@1.2.5/build/d3.layout.cloud.min.js"></script>
 
   <style>
-    body {
+    /* Сброс и базовые стили */
+    * {
       margin: 0;
       padding: 0;
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Open Sans', Arial, sans-serif;
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
       color: white;
+    }
+
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       text-align: center;
-      min-height: 100vh;
+      padding: 20px;
     }
+
     h1 {
-      font-size: 2.5em;
-      margin: 30px 0 10px;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      font-size: clamp(1.8rem, 4vw, 3.5rem);
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      letter-spacing: -0.5px;
     }
+
     p.lead {
-      font-size: 1.2em;
-      max-width: 600px;
-      margin: 10px auto 20px;
+      font-size: clamp(1rem, 2.5vw, 1.4rem);
+      max-width: 80%;
+      margin-bottom: 20px;
       opacity: 0.9;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
     }
+
     .form-link {
       display: inline-block;
-      padding: 14px 28px;
-      background: #ff6b6b;
+      padding: 12px 28px;
+      background: #ff6b35;
       color: white;
       text-decoration: none;
       border-radius: 50px;
-      font-weight: bold;
-      font-size: 18px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-      transition: transform 0.2s, box-shadow 0.2s;
+      font-weight: 600;
+      font-size: clamp(1rem, 2.5vw, 1.2rem);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
     }
+
     .form-link:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
     }
+
     button#refresh {
-      padding: 12px 24px;
-      font-size: 16px;
-      background-color: #f39c12;
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: clamp(0.9rem, 2vw, 1.1rem);
+      background-color: #4CAF50;
       color: white;
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      margin-top: 15px;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
       transition: background 0.3s;
     }
+
     button#refresh:hover {
-      background-color: #e67e22;
+      background-color: #45a049;
     }
+
     .loading {
-      color: #ecf0f1;
       font-style: italic;
-      margin: 20px 0;
-      font-size: 1.1em;
+      margin-top: 10px;
+      font-size: clamp(0.9rem, 2vw, 1.1rem);
+      color: #e0f7fa;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.4);
     }
+
     svg {
-      display: block;
-      margin: 20px auto;
-      width: 90%;
-      max-width: 1000px;
-      height: 600px;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
     }
+
+    g {
+      pointer-events: none;
+    }
+
     text {
-      transition: opacity 0.5s ease, transform 0.3s ease;
+      font-family: 'Open Sans', Impact, sans-serif;
+      font-weight: 700;
+      fill: white;
+      stroke: rgba(255, 255, 255, 0.2);
+      stroke-width: 1;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
+      transition: opacity 0.6s ease;
+    }
+
+    .overlay {
+      position: relative;
+      z-index: 1;
+      pointer-events: auto;
     }
   </style>
 </head>
 <body>
-  <h1>☁️ Облако слов из ваших ответов</h1>
-  <p class="lead">Пройдите форму — ваше слово станет частью общего облака!</p>
-  <a href="https://docs.google.com/forms/d/e/1FAIpQLSc6SUsLHNuJ6gSkoaaojPnDuYbZMnftZwYp_livh25zJcAn8A/viewform?usp=header" target="_blank" class="form-link">Пройти форму</a>
-  <button id="refresh">🔄 Обновить облако</button>
-  <p class="loading" id="status">Загрузка данных...</p>
-  <svg width="960" height="600"></svg>
+  <svg id="wordcloud-svg"></svg>
+
+  <div id="container">
+    <div class="overlay">
+      <h1>☁️ Облако слов из ваших ответов</h1>
+      <p class="lead">Пройдите форму — ваше слово станет частью общего облака!</p>
+      <a href="https://docs.google.com/forms/d/e/1FAIpQLSc6SUsLHNuJ6gSkoaaojPnDuYbZMnftZwYp_livh25zJcAn8A/viewform?usp=header" target="_blank" class="form-link">Пройти форму</a>
+      <button id="refresh">🔄 Обновить</button>
+      <p class="loading" id="status">Загрузка данных...</p>
+    </div>
+  </div>
 
   <script>
+    // 🔁 Замените на ваш URL из Google Apps Script
     const GAS_JSONP_URL = "https://script.google.com/macros/s/AKfycbyLQ2achxsI5EL8HXtFJGUlB0yeQeaSCGcgu6OD74eMFVGYUpuUard90yRey6I15BYX/exec";
+
     const statusText = document.getElementById("status");
-    const svg = d3.select("svg");
-    const g = svg.append("g").attr("transform", "translate(480,300)");
+    const svg = d3.select("#wordcloud-svg");
+    let width = window.innerWidth;
+    let height = window.innerHeight;
 
+    // Устанавливаем размер SVG
+    svg.attr("width", width).attr("height", height);
+    const g = svg.append("g");
+
+    // Цветовая шкала
+    const colorScale = d3.scaleSequential(d3.interpolateRainbow)
+      .domain([20, 100]);
+
+    // Обработчик изменения размера окна
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      svg.attr("width", width).attr("height", height);
+      if (currentWords) generateWordCloud(currentWords); // перерисовать
+    }
+
+    window.addEventListener("resize", resize);
+
+    // Храним текущие слова для перерисовки
+    let currentWords = null;
+
+    // Загрузка данных
     document.getElementById("refresh").addEventListener("click", loadFromGoogleSheets);
-
-    // Загрузить при запуске
-    loadFromGoogleSheets();
+    loadFromGoogleSheets(); // при старте
 
     function loadFromGoogleSheets() {
       statusText.textContent = "Загрузка данных...";
@@ -135,15 +210,15 @@
       try {
         const keys = Object.keys(data[0] || {});
         const textColumn = keys.length > 1 ? keys[keys.length - 1] : keys[0];
-
         const allText = data.map(row => row[textColumn] || "").join(" ");
-        const words = extractWords(allText);
 
+        const words = extractWords(allText);
         if (words.length === 0) {
-          statusText.textContent = "Нет подходящих слов для отображения.";
+          statusText.textContent = "Нет подходящих слов.";
           return;
         }
 
+        currentWords = words;
         generateWordCloud(words);
         statusText.textContent = `Показано ${Math.min(words.length, 100)} слов.`;
       } catch (err) {
@@ -171,17 +246,15 @@
           freq[word] = (freq[word] || 0) + 1;
         });
 
-      // 🔥 Главное: размер прямо пропорционален частоте!
-      const maxSize = 100; // максимальный возможный размер
       const maxFreq = Math.max(...Object.values(freq));
       const scale = d3.scaleLinear()
         .domain([1, maxFreq])
-        .range([20, maxSize]); // минимальный размер — 20px
+        .range([25, 100]); // от 25px до 100px
 
       return Object.entries(freq)
         .map(([text, count]) => ({
-          text,
-          size: scale(count), // ✅ Прямая пропорция!
+          text: text.charAt(0).toUpperCase() + text.slice(1), // Первая буква — заглавная
+          size: scale(count),
           frequency: count
         }))
         .sort((a, b) => b.size - a.size)
@@ -191,16 +264,12 @@
     function generateWordCloud(words) {
       g.selectAll("*").remove();
 
-      // Цветовая шкала по размеру
-      const colorScale = d3.scaleSequential(d3.interpolateViridis)
-        .domain(d3.extent(words, d => d.size));
-
       d3.layout.cloud()
-        .size([960, 600])
+        .size([width, height])
         .words(words)
-        .padding(2)
+        .padding(3)
         .rotate(() => 0)
-        .font("Impact")
+        .font("'Open Sans', Impact")
         .fontSize(d => d.size)
         .on("end", draw)
         .start();
@@ -210,14 +279,12 @@
           .data(words)
           .enter().append("text")
           .style("font-size", d => d.size + "px")
-          .style("font-family", "Arial") // лучше читается
           .style("fill", d => colorScale(d.size))
-          .style("stroke", "white")
-          .style("stroke-width", 2)
-          .style("text-shadow", "2px 2px 4px rgba(0,0,0,0.5)")
+          .style("stroke", "rgba(255,255,255,0.2)")
+          .style("stroke-width", 1)
           .attr("text-anchor", "middle")
           .attr("transform", d => `translate(${d.x},${d.y})`)
-          .text(d => d.text)
+          .text(d => d.text.toUpperCase()) // 🚀 Все слова — большими буквами!
           .style("opacity", 0)
           .transition()
           .duration(800)
