@@ -2,90 +2,210 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Облако слов из Google Forms</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Облако слов от пользователей</title>
+
+  <!-- Подключаем D3.js и d3-cloud -->
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-cloud@1.2.5/build/d3.layout.cloud.min.js"></script>
+
   <style>
-    body { font-family: Arial; padding: 20px; text-align: center; }
-    svg { border: 1px solid #ddd; background: white; margin: 20px auto; }
-    button { padding: 10px 20px; font-size: 16px; }
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f9f9f9;
+      color: #333;
+      text-align: center;
+    }
+    h1 {
+      color: #2c3e50;
+    }
+    p.lead {
+      font-size: 1.1em;
+      max-width: 600px;
+      margin: 10px auto;
+    }
+    .form-link {
+      display: inline-block;
+      margin: 20px 0;
+      padding: 12px 24px;
+      background-color: #3498db;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    .form-link:hover {
+      background-color: #2980b9;
+    }
+    button#refresh {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #2ecc71;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button#refresh:hover {
+      background-color: #27ae60;
+    }
+    svg {
+      border: 1px solid #ddd;
+      background: white;
+      margin: 20px auto;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .loading {
+      color: #7f8c8d;
+      font-style: italic;
+      margin: 10px 0;
+    }
   </style>
 </head>
 <body>
   <h1>Облако слов: что вы думаете?</h1>
-  <p><a href="https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform" target="_blank">Пройти форму →</a></p>
-  <button onclick="loadAndGenerate()">Обновить облако</button>
+  <p class="lead">Пройдите короткую форму — ваш ответ станет частью общего облака слов!</p>
+  <a href="https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform" target="_blank" class="form-link">Пройти форму</a>
+
+  <button id="refresh">🔄 Обновить облако</button>
+  <p class="loading" id="status">Загрузка данных...</p>
+
   <svg width="960" height="600"></svg>
 
   <script>
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby1W6c-ha0i1Tuphu1pRSk5kGLpKv0pdpcKWalMp7jyQgWvQWVu0uUaWRmNhuJM06o8/exec";
+    // 🔁 Замените на ваш URL из Google Apps Script
+    const GAS_JSONP_URL = "https://script.google.com/macros/s/AKfycbyLQ2achxsI5EL8HXtFJGUlB0yeQeaSCGcgu6OD74eMFVGYUpuUard90yRey6I15BYX/exec";
 
-    async function loadAndGenerate() {
+    // Элементы DOM
+    const statusText = document.getElementById("status");
+    const svg = d3.select("svg");
+    const g = svg.append("g").attr("transform", "translate(480,300)");
+
+    // Кнопка обновления
+    document.getElementById("refresh").addEventListener("click", loadFromGoogleSheets);
+
+    // Загрузить при запуске
+    loadFromGoogleSheets();
+
+    // Функция загрузки через JSONP
+    function loadFromGoogleSheets() {
+      // Очистка предыдущего состояния
+      statusText.textContent = "Загрузка данных...";
+      g.selectAll("*").remove();
+
+      // Удаляем старый тег script, если есть
+      const oldScript = document.getElementById("jsonp-script");
+      if (oldScript) oldScript.remove();
+
+      // Динамически добавляем скрипт
+      const script = document.createElement("script");
+      script.id = "jsonp-script";
+      script.src = `${GAS_JSONP_URL}?callback=handleData`;
+      script.onerror = () => {
+        statusText.textContent = "Ошибка загрузки данных. Попробуйте позже.";
+      };
+      document.body.appendChild(script);
+    }
+
+    // Колбэк, вызываемый после получения данных
+    function handleData(data) {
+      const script = document.getElementById("jsonp-script");
+      if (script) script.remove(); // удаляем после выполнения
+
+      if (!data || data.length === 0) {
+        statusText.textContent = "Пока нет ни одного ответа. Пройдите форму!";
+        return;
+      }
+
+      if (data.error) {
+        console.error("Ошибка от сервера:", data);
+        statusText.textContent = "Ошибка: " + data.message;
+        return;
+      }
+
       try {
-        const response = await fetch(GOOGLE_SCRIPT_URL);
-        const data = await response.json();
+        // Извлекаем текст из колонки (подставьте правильное имя)
+        // Обычно первая колонка — временная метка, вторая — ответ
+        const firstRow = data[0];
+        const keys = Object.keys(firstRow);
+        const textColumn = keys[keys.length - 1]; // последняя колонка — скорее всего ответ
 
-        // Предположим, колонка называется "YourAnswer" или похоже
-        const textColumn = Object.keys(data[0] || {})[1]; // обычно вторая колонка — время, третья — ответ
         const allText = data.map(row => row[textColumn] || "").join(" ");
 
         const words = extractWords(allText);
-
-        d3.select("svg").selectAll("*").remove(); // очистить
-
         if (words.length === 0) {
-          alert("Пока нет данных.");
+          statusText.textContent = "Нет подходящих слов для отображения.";
           return;
         }
 
-        d3.layout.cloud()
-          .size([960, 600])
-          .words(words)
-          .padding(2)
-          .font("Impact")
-          .fontSize(d => d.size)
-          .rotate(() => 0)
-          .on("end", draw)
-          .start();
-
+        generateWordCloud(words);
+        statusText.textContent = `Показано ${Math.min(words.length, 100)} слов.`;
       } catch (err) {
-        console.error("Ошибка загрузки данных:", err);
-        alert("Не удалось загрузить данные.");
+        console.error("Ошибка обработки данных:", err);
+        statusText.textContent = "Ошибка анализа данных.";
       }
     }
 
+    // Извлечение и подсчёт частоты слов
     function extractWords(text) {
-      const words = text
+      const cleanText = text
         .toLowerCase()
-        .replace(/[^\w\sа-яё]/gi, '')
-        .split(/\s+/)
-        .filter(w => w.length > 2 && !/^(и|в|на|с|к|от|по|но|а|я|мы|он|она|они|это)$/i.test(w));
+        .replace(/[^\w\sа-яё-]/gi, ' ') // заменяем пунктуацию на пробелы
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const words = cleanText.split(/\s+/).filter(w => w.length > 2);
+
+      // Стоп-слова (можно расширить)
+      const stopWords = new Set([
+        'и', 'в', 'на', 'с', 'к', 'у', 'по', 'но', 'а', 'я', 'мы', 'вы', 'он', 'она',
+        'они', 'это', 'тот', 'так', 'как', 'же', 'ли', 'бы', 'что', 'который'
+      ]);
 
       const freq = {};
-      words.forEach(w => freq[w] = (freq[w] || 0) + 1);
+      words.forEach(word => {
+        if (!stopWords.has(word)) {
+          freq[word] = (freq[word] || 0) + 1;
+        }
+      });
 
+      // Преобразуем в массив и сортируем по частоте
       return Object.entries(freq)
-        .map(([text, count]) => ({ text, size: count * 10 }))
+        .map(([text, count]) => ({ text, size: Math.max(10, count * 10) }))
         .sort((a, b) => b.size - a.size)
-        .slice(0, 100);
+        .slice(0, 100); // максимум 100 слов
     }
 
-    function draw(words) {
-      d3.select("svg").append("g")
-        .attr("transform", "translate(480,300)")
-        .selectAll("text")
-        .data(words)
-        .enter().append("text")
-        .style("font-size", d => d.size + "px")
-        .style("font-family", "Impact")
-        .style("fill", () => d3.interpolateSinebow(Math.random()))
-        .attr("text-anchor", "middle")
-        .attr("transform", d => `translate(${d.x},${d.y})`)
-        .text(d => d.text);
-    }
+    // Генерация облака слов
+    function generateWordCloud(words) {
+      g.selectAll("*").remove(); // очистить
 
-    // Загрузить при открытии
-    loadAndGenerate();
+      d3.layout.cloud()
+        .size([960, 600])
+        .words(words)
+        .padding(3)
+        .rotate(() => 0) // все слова горизонтально
+        .font("Impact")
+        .fontSize(d => d.size)
+        .on("end", draw)
+        .start();
+
+      function draw(words) {
+        g.selectAll("text")
+          .data(words)
+          .enter().append("text")
+          .style("font-size", d => d.size + "px")
+          .style("font-family", "Impact")
+          .style("fill", () => d3.interpolateSinebow(Math.random()))
+          .attr("text-anchor", "middle")
+          .attr("transform", d => `translate(${d.x},${d.y})`)
+          .text(d => d.text);
+      }
+    }
   </script>
 </body>
 </html>
