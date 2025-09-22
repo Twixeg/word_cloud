@@ -2,80 +2,90 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Облако слов</title>
+  <title>Облако слов из Google Forms</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3-cloud@1.2.5/build/d3.layout.cloud.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background-color: #f4f4f4;
-    }
-    svg {
-      border: 1px solid #ddd;
-      background: white;
-      margin: 20px 0;
-    }
-    h1 {
-      color: #333;
-    }
-    .loading {
-      color: #666;
-      font-style: italic;
-    }
+    body { font-family: Arial; padding: 20px; text-align: center; }
+    svg { border: 1px solid #ddd; background: white; margin: 20px auto; }
+    button { padding: 10px 20px; font-size: 16px; }
   </style>
 </head>
 <body>
-  <h1>Моё облако слов</h1>
-  <p class="loading">Загрузка слов...</p>
+  <h1>Облако слов: что вы думаете?</h1>
+  <p><a href="https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform" target="_blank">Пройти форму →</a></p>
+  <button onclick="loadAndGenerate()">Обновить облако</button>
   <svg width="960" height="600"></svg>
 
   <script>
-    d3.json("words.json")
-      .then(function(words) {
-        document.querySelector(".loading").textContent = "Генерация облака...";
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXXX/exec";
 
-        const width = 960;
-        const height = 600;
+    async function loadAndGenerate() {
+      try {
+        const response = await fetch(GOOGLE_SCRIPT_URL);
+        const data = await response.json();
 
-        const layout = d3.layout.cloud()
-          .size([width, height])
-          .words(words.map(d => Object.create(d)))
-          .padding(3)
-          .rotate(() => 0)
+        // Предположим, колонка называется "YourAnswer" или похоже
+        const textColumn = Object.keys(data[0] || {})[1]; // обычно вторая колонка — время, третья — ответ
+        const allText = data.map(row => row[textColumn] || "").join(" ");
+
+        const words = extractWords(allText);
+
+        d3.select("svg").selectAll("*").remove(); // очистить
+
+        if (words.length === 0) {
+          alert("Пока нет данных.");
+          return;
+        }
+
+        d3.layout.cloud()
+          .size([960, 600])
+          .words(words)
+          .padding(2)
           .font("Impact")
-          .fontSize(d => d.value * 5)
-          .on("end", function(finishedWords) {
-            draw(finishedWords, width, height);
-          })
+          .fontSize(d => d.size)
+          .rotate(() => 0)
+          .on("end", draw)
           .start();
 
-        function draw(words, w, h) {
-          const svg = d3.select("svg");
-          const g = svg.append("g")
-            .attr("transform", `translate(${w/2},${h/2})`);
+      } catch (err) {
+        console.error("Ошибка загрузки данных:", err);
+        alert("Не удалось загрузить данные.");
+      }
+    }
 
-          g.selectAll("text")
-            .data(words)
-            .enter().append("text")
-            .style("font-size", d => d.size + "px")
-            .style("font-family", "Impact")
-            .style("fill", () => d3.schemeCategory10[Math.floor(Math.random() * 10)])
-            .attr("text-anchor", "middle")
-            .attr("transform", d => `translate(${d.x},${d.y})`)
-            .text(d => d.text);
+    function extractWords(text) {
+      const words = text
+        .toLowerCase()
+        .replace(/[^\w\sа-яё]/gi, '')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !/^(и|в|на|с|к|от|по|но|а|я|мы|он|она|они|это)$/i.test(w));
 
-          document.querySelector(".loading").textContent = "";
-        }
-      })
-      .catch(err => {
-        document.querySelector(".loading").textContent = "Ошибка загрузки слов: " + err.message;
-        console.error(err);
-      });
+      const freq = {};
+      words.forEach(w => freq[w] = (freq[w] || 0) + 1);
+
+      return Object.entries(freq)
+        .map(([text, count]) => ({ text, size: count * 10 }))
+        .sort((a, b) => b.size - a.size)
+        .slice(0, 100);
+    }
+
+    function draw(words) {
+      d3.select("svg").append("g")
+        .attr("transform", "translate(480,300)")
+        .selectAll("text")
+        .data(words)
+        .enter().append("text")
+        .style("font-size", d => d.size + "px")
+        .style("font-family", "Impact")
+        .style("fill", () => d3.interpolateSinebow(Math.random()))
+        .attr("text-anchor", "middle")
+        .attr("transform", d => `translate(${d.x},${d.y})`)
+        .text(d => d.text);
+    }
+
+    // Загрузить при открытии
+    loadAndGenerate();
   </script>
 </body>
 </html>
