@@ -173,9 +173,9 @@
     <div class="background"></div>
 
     <div id="container">
-        <h1>Что для Вас значит слово "ПАТРИОТИЗМ"?</h1>
-        <p class="lead">Пройдите форму — ваше слово станет частью общего мнения!</p>
-        <a href="https://docs.google.com/forms/d/e/1FAIpQLSc6SUsLHNuJ6gSkoaaojPnDuYbZMnftZwYp_livh25zJcAn8A/viewform?usp=header" target="_blank" class="form-link">Пройти форму</a>
+        <h1>☁️ Облако слов из ваших ответов</h1>
+        <p class="lead">Пройдите форму — ваше слово станет частью общего облака!</p>
+        <a href="https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform" target="_blank" class="form-link">Пройти форму</a>
         <button id="refresh">🔄 Обновить</button>
         <p class="loading" id="status">Загрузка данных...</p>
     </div>
@@ -360,8 +360,8 @@
             return entries.slice(0, MAX_WORDS).map(([text, count]) => ({
                 text: text.charAt(0).toUpperCase() + text.slice(1),
                 size: top3Words.has(text) ? 
-                      minSize + sizeDiff * (count / maxFreq) * 1.3 : 
-                      minSize + sizeDiff * (count / maxFreq),
+                    minSize + sizeDiff * (count / maxFreq) * 1.3 : 
+                    minSize + sizeDiff * (count / maxFreq),
                 frequency: count,
                 colorIndex: Math.floor(Math.random() * wordColors.length)
             }));
@@ -387,7 +387,7 @@
             d3.layout.cloud()
                 .size([width, height])
                 .words(words)
-                .padding(2)
+                .padding(3) // Увеличил padding для лучшей читаемости на мобильных
                 .rotate(() => 0)
                 .font("'Open Sans', sans-serif")
                 .fontSize(d => d.size)
@@ -416,17 +416,19 @@
             const startTime = isInitial ? performance.now() : 0;
             
             function animate(now) {
-                if (!width || !height) return;
+                if (!width || !height) {
+                    animationFrameId = requestAnimationFrame(animate);
+                    return;
+                }
                 
                 ctx.clearRect(0, 0, width, height);
                 ctx.save();
                 ctx.translate(width / 2, height / 2);
 
-                const elapsedTime = isInitial ? (now - startTime) : 1000;
+                const elapsedTime = now - startTime;
                 const progress = isInitial ? Math.min(elapsedTime / animationDuration, 1) : 1;
-                const easeProgress = progress < 0.5 
-                    ? 2 * progress * progress 
-                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                
+                const easeProgress = d3.easeCubicInOut(progress);
 
                 const timeFactor = now / 2000;
                 
@@ -465,28 +467,17 @@
             animationFrameId = requestAnimationFrame(animate);
         }
 
-        // Исправленная инициализация
         function init() {
-            // Прямая инициализация без ожидания шрифтов
             initializeCanvas();
             loadFromGoogleSheets();
-            
-            // Резервный таймер на случай проблем с загрузкой
-            setTimeout(() => {
-                if (!currentWords) {
-                    resizeCanvas();
-                }
-            }, 500);
         }
 
-        // Запуск инициализации после полной загрузки страницы
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', init);
         } else {
             init();
         }
 
-        // Очистка ресурсов
         window.addEventListener('beforeunload', () => {
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
