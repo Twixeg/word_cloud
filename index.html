@@ -17,17 +17,18 @@
             box-sizing: border-box;
         }
 
-        /* Анимируемый фон */
+        /* Оптимизированный анимируемый фон */
         .background {
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
             z-index: -1;
             background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
             background-size: 300% 300%;
             animation: gradientShift 15s ease infinite alternate, gradientFlow 25s ease-in-out infinite;
+            will-change: background-position, background-size;
         }
 
         @keyframes gradientShift {
@@ -51,6 +52,7 @@
             background: transparent;
             display: flex;
             flex-direction: column;
+            touch-action: manipulation;
         }
 
         #container {
@@ -59,6 +61,7 @@
             text-align: center;
             z-index: 10;
             position: relative;
+            pointer-events: auto;
         }
 
         h1 {
@@ -67,6 +70,7 @@
             margin-bottom: 10px;
             text-shadow: 0 2px 8px rgba(0,0,0,0.4);
             letter-spacing: -0.5px;
+            transform: translateZ(0);
         }
 
         p.lead {
@@ -75,6 +79,7 @@
             margin: 0 auto 20px;
             opacity: 0.9;
             text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+            transform: translateZ(0);
         }
 
         .form-link {
@@ -87,11 +92,13 @@
             font-weight: 600;
             font-size: clamp(1rem, 2.5vw, 1.2rem);
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            transition: all 0.3s ease;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s;
+            will-change: transform;
+            backface-visibility: hidden;
         }
 
         .form-link:hover {
-            transform: translateY(-2px);
+            transform: translateY(-2px) scale(1.02);
             box-shadow: 0 6px 20px rgba(0,0,0,0.4);
         }
 
@@ -105,11 +112,18 @@
             border-radius: 6px;
             cursor: pointer;
             box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-            transition: background 0.3s;
+            transition: background-color 0.3s, transform 0.2s;
+            will-change: transform;
+            backface-visibility: hidden;
         }
 
         button#refresh:hover {
             background-color: #45a049;
+            transform: translateY(-1px);
+        }
+
+        button#refresh:active {
+            transform: translateY(0);
         }
 
         .loading {
@@ -118,17 +132,40 @@
             font-size: clamp(0.9rem, 2vw, 1.1rem);
             color: #e0f7fa;
             text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+            opacity: 1;
+            transition: opacity 0.3s ease;
         }
         
         #canvas-wrapper {
             flex-grow: 1;
             position: relative;
+            overflow: hidden;
+            contain: layout style paint;
         }
         
         #wordcloud-canvas {
             position: absolute;
             top: 0;
             left: 0;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            will-change: transform;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            p.lead {
+                font-size: 1.1rem;
+                max-width: 90%;
+            }
+            
+            .form-link {
+                padding: 10px 20px;
+                font-size: 1rem;
+            }
         }
     </style>
 </head>
@@ -138,7 +175,7 @@
     <div id="container">
         <h1>☁️ Облако слов из ваших ответов</h1>
         <p class="lead">Пройдите форму — ваше слово станет частью общего облака!</p>
-        <a href="https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform" target="_blank" class="form-link">Пройти форму</a>
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSc6SUsLHNuJ6gSkoaaojPnDuYbZMnftZwYp_livh25zJcAn8A/viewform?usp=header" target="_blank" class="form-link">Пройти форму</a>
         <button id="refresh">🔄 Обновить</button>
         <p class="loading" id="status">Загрузка данных...</p>
     </div>
@@ -151,55 +188,99 @@
         const GAS_JSONP_URL = "https://script.google.com/macros/s/AKfycbyLQ2achxsI5EL8HXtFJGUlB0yeQeaSCGcgu6OD74eMFVGYUpuUard90yRey6I15BYX/exec";
         const statusText = document.getElementById("status");
         const canvas = document.getElementById("wordcloud-canvas");
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext("2d", { alpha: true });
         const canvasWrapper = document.getElementById("canvas-wrapper");
         
         let currentWords = null;
         let width, height;
+        let resizeTimeout = null;
 
-        // Палитра цветов для слов
         const wordColors = [
             '#ff6b6b', '#ff9f43', '#feca57', '#ffeaa7', '#55efc4',
             '#81ecec', '#74b9ff', '#a29bfe', '#dfe6e9', '#00cec9'
-        ];
+        ].map(color => ({
+            fill: color,
+            stroke: 'rgba(255, 255, 255, 0.9)'
+        }));
         
-        const floatRange = 10;
-        const animationDuration = 1500;
-        const shadowBlur = 8;
-        const shadowColor = 'rgba(0, 0, 0, 0.4)';
+        const floatRange = 8;
+        const animationDuration = 1200;
+        const shadowBlur = 6;
+        const MAX_WORDS = 80;
 
         function resizeCanvas() {
-            width = canvasWrapper.offsetWidth;
-            height = canvasWrapper.offsetHeight;
-            canvas.width = width;
-            canvas.height = height;
-            if (currentWords) generateWordCloud(currentWords);
+            if (resizeTimeout) {
+                clearTimeout(resizeTimeout);
+            }
+            
+            resizeTimeout = setTimeout(() => {
+                const newWidth = canvasWrapper.offsetWidth;
+                const newHeight = canvasWrapper.offsetHeight;
+                
+                if (newWidth === 0 || newHeight === 0) return;
+                
+                width = newWidth;
+                height = newHeight;
+                
+                const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+                canvas.width = width * dpr;
+                canvas.height = height * dpr;
+                canvas.style.width = width + 'px';
+                canvas.style.height = height + 'px';
+                
+                ctx.scale(dpr, dpr);
+                
+                // Показываем статус только если нет слов
+                if (!currentWords) {
+                    statusText.style.opacity = 1;
+                }
+                
+                if (currentWords) {
+                    generateWordCloud(currentWords);
+                }
+            }, 50);
         }
 
-        window.addEventListener("resize", resizeCanvas);
+        // Инициализация размеров при загрузке
+        function initializeCanvas() {
+            resizeCanvas();
+            // Принудительный вызов ресайза для немедленного отображения
+            setTimeout(resizeCanvas, 100);
+        }
 
-        document.getElementById("refresh").addEventListener("click", loadFromGoogleSheets);
-        loadFromGoogleSheets();
+        if ('ResizeObserver' in window) {
+            const resizeObserver = new ResizeObserver(initializeCanvas);
+            resizeObserver.observe(canvasWrapper);
+        } else {
+            window.addEventListener("resize", initializeCanvas);
+        }
+
+        const refreshBtn = document.getElementById("refresh");
+        refreshBtn.addEventListener("click", loadFromGoogleSheets, { passive: true });
 
         function loadFromGoogleSheets() {
+            statusText.style.opacity = 1;
             statusText.textContent = "Загрузка данных...";
-            ctx.clearRect(0, 0, width, height);
+            
             const oldScript = document.getElementById("jsonp-script");
             if (oldScript) oldScript.remove();
 
             const script = document.createElement("script");
             script.id = "jsonp-script";
-            script.src = `${GAS_JSONP_URL}?callback=handleData`;
+            script.src = `${GAS_JSONP_URL}?callback=handleData&t=${Date.now()}`;
+            script.async = true;
+            script.onload = () => script.remove();
             script.onerror = () => {
                 statusText.textContent = "Ошибка загрузки данных.";
+                script.remove();
             };
-            document.body.appendChild(script);
+            
+            document.head.appendChild(script);
         }
 
         function handleData(data) {
-            const script = document.getElementById("jsonp-script");
-            if (script) script.remove();
-
+            const now = Date.now();
+            
             if (!data || data.length === 0) {
                 statusText.textContent = "Пока нет ответов. Будьте первым!";
                 return;
@@ -214,7 +295,7 @@
             try {
                 const keys = Object.keys(data[0] || {});
                 const textColumn = keys.length > 1 ? keys[keys.length - 1] : keys[0];
-                const allText = data.map(row => row[textColumn] || "").join(" ");
+                const allText = data.map(row => (row[textColumn] || "").trim()).join(" ");
 
                 const words = extractWords(allText);
                 if (words.length === 0) {
@@ -223,76 +304,104 @@
                 }
 
                 currentWords = words;
+                
+                // Принудительный ресайз для отображения
                 resizeCanvas();
-                statusText.textContent = `Показано ${Math.min(words.length, 100)} слов.`;
+                
+                // Скрываем статус после успешной загрузки
+                setTimeout(() => {
+                    statusText.style.opacity = 0;
+                }, 1500);
+                
+                statusText.textContent = `Показано ${Math.min(words.length, MAX_WORDS)} слов.`;
             } catch (err) {
                 console.error("Ошибка обработки:", err);
                 statusText.textContent = "Ошибка анализа текста.";
             }
         }
 
+        const stopWordsSet = new Set([
+            'и', 'в', 'на', 'с', 'к', 'у', 'по', 'но', 'а', 'я', 'мы', 'вы', 'он', 'она', 'они',
+            'это', 'тот', 'так', 'как', 'же', 'ли', 'бы', 'что', 'который', 'если', 'или',
+            'все', 'весь', 'этот', 'для', 'быть', 'его', 'ее', 'их', 'мне', 'меня', 'тебя',
+            'чем', 'кто', 'где', 'когда', 'почему', 'зачем', 'потому', 'свои', 'свой', 'свою'
+        ]);
+
         function extractWords(text) {
             const cleanText = text
                 .toLowerCase()
-                .replace(/[^\w\sа-яё-]/gi, ' ')
+                .replace(/[^\w\sа-яё-]/g, ' ')
                 .replace(/\s+/g, ' ')
                 .trim();
 
-            const stopWords = new Set([
-                'и', 'в', 'на', 'с', 'к', 'у', 'по', 'но', 'а', 'я', 'мы', 'вы', 'он', 'она', 'они',
-                'это', 'тот', 'так', 'как', 'же', 'ли', 'бы', 'что', 'который', 'если', 'или'
-            ]);
+            if (!cleanText) return [];
 
             const freq = {};
-            cleanText.split(/\s+/)
-                .filter(w => w.length > 2 && !stopWords.has(w))
-                .forEach(word => {
+            const words = cleanText.split(' ');
+            
+            for (let word of words) {
+                if (word.length > 2 && !stopWordsSet.has(word)) {
                     freq[word] = (freq[word] || 0) + 1;
-                });
+                }
+            }
 
-            const sortedWords = Object.entries(freq)
-                .map(([text, count]) => ({ text, count }))
-                .sort((a, b) => b.count - a.count);
+            if (Object.keys(freq).length === 0) return [];
 
-            const maxFreq = sortedWords[0] ? sortedWords[0].count : 1;
+            const entries = Object.entries(freq);
+            entries.sort((a, b) => b[1] - a[1]);
+
+            const maxFreq = entries[0][1];
+            const top3Words = new Set(entries.slice(0, 3).map(([text]) => text));
             
-            const top3Words = sortedWords.slice(0, 3).map(d => d.text);
-            
-            const scale = d3.scaleLinear()
-                .domain([1, maxFreq])
-                .range([20, 100]);
+            const minSize = 20;
+            const maxSize = 80;
+            const sizeDiff = maxSize - minSize;
 
-            return Object.entries(freq)
-                .map(([text, count]) => ({
-                    text: text.charAt(0).toUpperCase() + text.slice(1),
-                    size: top3Words.includes(text) ? scale(count) * 1.5 : scale(count),
-                    frequency: count
-                }))
-                .sort((a, b) => b.size - a.size)
-                .slice(0, 100);
+            return entries.slice(0, MAX_WORDS).map(([text, count]) => ({
+                text: text.charAt(0).toUpperCase() + text.slice(1),
+                size: top3Words.has(text) ? 
+                      minSize + sizeDiff * (count / maxFreq) * 1.3 : 
+                      minSize + sizeDiff * (count / maxFreq),
+                frequency: count,
+                colorIndex: Math.floor(Math.random() * wordColors.length)
+            }));
         }
 
         const animatedWords = [];
         let animationFrameId = null;
-        let animationStartTime = 0;
 
         function generateWordCloud(words) {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
             animatedWords.length = 0;
+
+            // Проверка размеров перед генерацией
+            if (!width || !height) {
+                setTimeout(() => generateWordCloud(words), 100);
+                return;
+            }
 
             d3.layout.cloud()
                 .size([width, height])
                 .words(words)
-                .padding(3)
+                .padding(2)
                 .rotate(() => 0)
-                .font("'Open Sans', Impact")
+                .font("'Open Sans', sans-serif")
                 .fontSize(d => d.size)
+                .spiral('rectangular')
                 .on("end", (newWords) => {
+                    const now = performance.now();
+                    
                     newWords.forEach(word => {
                         word.initialX = word.x;
                         word.initialY = word.y;
-                        word.animationOffset = Math.random() * 2 * Math.PI;
-                        word.color = wordColors[Math.floor(Math.random() * wordColors.length)];
+                        word.animationOffset = Math.random() * Math.PI * 2;
+                        word.colorIndex = Math.floor(Math.random() * wordColors.length);
                     });
+                    
                     animatedWords.push(...newWords);
                     startAnimation(true);
                 })
@@ -303,57 +412,86 @@
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
             }
-            if (isInitial) {
-                animationStartTime = performance.now();
-            }
-            animate();
-        }
-
-        function animate(now) {
-            ctx.clearRect(0, 0, width, height);
-            ctx.save();
-            ctx.translate(width / 2, height / 2);
-
-            const timeFactor = now / 2000;
-            const elapsedTime = now - animationStartTime;
-            const progress = Math.min(elapsedTime / animationDuration, 1);
             
-            const scaleFactor = d3.easeCubicInOut(progress);
+            const startTime = isInitial ? performance.now() : 0;
             
-            animatedWords.forEach((word) => {
-                const t = timeFactor + word.animationOffset;
-                const xOffset = d3.easeCubicInOut(Math.sin(t)) * floatRange;
-                const yOffset = d3.easeCubicInOut(Math.cos(t)) * floatRange;
-
-                const currentSize = word.size * scaleFactor;
+            function animate(now) {
+                if (!width || !height) return;
                 
-                // Эффект тени для текста
-                ctx.shadowBlur = shadowBlur;
-                ctx.shadowColor = shadowColor;
-                
-                ctx.fillStyle = word.color; // Использование случайного цвета
-                ctx.font = `${currentSize}px 'Open Sans', Impact`;
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                
+                ctx.clearRect(0, 0, width, height);
                 ctx.save();
-                ctx.translate(word.initialX + xOffset, word.initialY + yOffset);
-                ctx.rotate(word.rotate * Math.PI / 180);
+                ctx.translate(width / 2, height / 2);
 
-                // Белый контур
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
-                ctx.lineWidth = 1;
-                ctx.strokeText(word.text.toUpperCase(), 0, 0);
+                const elapsedTime = isInitial ? (now - startTime) : 1000;
+                const progress = isInitial ? Math.min(elapsedTime / animationDuration, 1) : 1;
+                const easeProgress = progress < 0.5 
+                    ? 2 * progress * progress 
+                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-                // Заливка текста
-                ctx.fillText(word.text.toUpperCase(), 0, 0);
+                const timeFactor = now / 2000;
+                
+                animatedWords.forEach((word) => {
+                    const t = timeFactor + word.animationOffset;
+                    const xOffset = Math.sin(t) * floatRange * easeProgress;
+                    const yOffset = Math.cos(t) * floatRange * easeProgress;
+
+                    const currentSize = word.size * easeProgress;
+                    
+                    const color = wordColors[word.colorIndex];
+                    ctx.fillStyle = color.fill;
+                    ctx.strokeStyle = color.stroke;
+                    ctx.lineWidth = 1;
+                    ctx.font = `${currentSize}px 'Open Sans', sans-serif`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    
+                    ctx.shadowBlur = shadowBlur * easeProgress;
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                    
+                    ctx.save();
+                    ctx.translate(word.initialX + xOffset, word.initialY + yOffset);
+                    
+                    ctx.strokeText(word.text.toUpperCase(), 0, 0);
+                    ctx.fillText(word.text.toUpperCase(), 0, 0);
+                    
+                    ctx.restore();
+                });
                 
                 ctx.restore();
-            });
+                
+                animationFrameId = requestAnimationFrame(animate);
+            }
             
-            ctx.restore();
             animationFrameId = requestAnimationFrame(animate);
         }
+
+        // Исправленная инициализация
+        function init() {
+            // Прямая инициализация без ожидания шрифтов
+            initializeCanvas();
+            loadFromGoogleSheets();
+            
+            // Резервный таймер на случай проблем с загрузкой
+            setTimeout(() => {
+                if (!currentWords) {
+                    resizeCanvas();
+                }
+            }, 500);
+        }
+
+        // Запуск инициализации после полной загрузки страницы
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+
+        // Очистка ресурсов
+        window.addEventListener('beforeunload', () => {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+        });
     </script>
 </body>
 </html>
