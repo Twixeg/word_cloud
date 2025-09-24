@@ -5,19 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <title>Облако слов</title>
 
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet" />
 
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-cloud@1.2.5/build/d3.layout.cloud.min.js"></script>
 
     <style>
+        :root {
+            --primary-color: #ff6b35;
+            --secondary-color: #4CAF50;
+            --text-color: #ffffff;
+            --shadow-color: rgba(0, 0, 0, 0.5);
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-        /* Оптимизированный анимируемый фон */
+        /* Улучшенный анимированный фон */
         .background {
             position: fixed;
             top: 0;
@@ -27,8 +34,8 @@
             z-index: -1;
             background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
             background-size: 300% 300%;
-            animation: gradientShift 15s ease infinite alternate, gradientFlow 25s ease-in-out infinite;
-            will-change: background-position, background-size;
+            animation: gradientShift 15s ease infinite alternate;
+            will-change: background-position;
         }
 
         @keyframes gradientShift {
@@ -37,22 +44,15 @@
             100% { background-position: 0% 50%; }
         }
 
-        @keyframes gradientFlow {
-            0% { background-size: 300% 300%; }
-            50% { background-size: 200% 200%; }
-            100% { background-size: 300% 300%; }
-        }
-
         body {
             width: 100vw;
             height: 100vh;
             overflow: hidden;
-            font-family: 'Open Sans', Arial, sans-serif;
-            color: white;
+            font-family: 'Montserrat', sans-serif;
+            color: var(--text-color);
             background: transparent;
             display: flex;
             flex-direction: column;
-            touch-action: manipulation;
         }
 
         #container {
@@ -61,79 +61,68 @@
             text-align: center;
             z-index: 10;
             position: relative;
-            pointer-events: auto;
         }
 
         h1 {
-            font-size: clamp(2rem, 4vw, 3.5rem);
+            font-size: clamp(1.8rem, 5vw, 3rem);
             font-weight: 700;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 8px rgba(0,0,0,0.4);
-            letter-spacing: -0.5px;
-            transform: translateZ(0);
+            margin-bottom: 12px;
+            text-shadow: 0 4px 8px var(--shadow-color);
         }
 
         p.lead {
-            font-size: clamp(1rem, 2.5vw, 1.4rem);
-            max-width: 80%;
+            font-size: clamp(1rem, 2.5vw, 1.3rem);
+            max-width: 90%;
             margin: 0 auto 20px;
             opacity: 0.9;
-            text-shadow: 0 1px 4px rgba(0,0,0,0.5);
-            transform: translateZ(0);
+            text-shadow: 0 2px 4px var(--shadow-color);
         }
 
         .form-link {
             display: inline-block;
             padding: 12px 28px;
-            background: #ff6b35;
-            color: white;
+            background: var(--primary-color);
+            color: var(--text-color);
             text-decoration: none;
             border-radius: 50px;
-            font-weight: 600;
+            font-weight: 700;
             font-size: clamp(1rem, 2.5vw, 1.2rem);
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s;
-            will-change: transform;
-            backface-visibility: hidden;
         }
 
-        .form-link:hover {
-            transform: translateY(-2px) scale(1.02);
+        .form-link:hover,
+        .form-link:active {
+            transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0,0,0,0.4);
         }
 
         button#refresh {
             margin-top: 15px;
-            padding: 10px 20px;
+            padding: 10px 24px;
             font-size: clamp(0.9rem, 2vw, 1.1rem);
-            background-color: #4CAF50;
-            color: white;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-            transition: background-color 0.3s, transform 0.2s;
-            will-change: transform;
-            backface-visibility: hidden;
+            transition: all 0.3s;
         }
 
-        button#refresh:hover {
-            background-color: #45a049;
-            transform: translateY(-1px);
-        }
-
+        button#refresh:hover,
         button#refresh:active {
-            transform: translateY(0);
+            background-color: #3e8e41;
+            transform: translateY(-1px);
         }
 
         .loading {
             font-style: italic;
             margin-top: 10px;
             font-size: clamp(0.9rem, 2vw, 1.1rem);
-            color: #e0f7fa;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+            color: #c5e1a5;
+            text-shadow: 0 1px 3px var(--shadow-color);
             opacity: 1;
-            transition: opacity 0.3s ease;
         }
         
         #canvas-wrapper {
@@ -147,25 +136,8 @@
             position: absolute;
             top: 0;
             left: 0;
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-            will-change: transform;
-        }
-
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 2.2rem;
-            }
-            
-            p.lead {
-                font-size: 1.1rem;
-                max-width: 90%;
-            }
-            
-            .form-link {
-                padding: 10px 20px;
-                font-size: 1rem;
-            }
+            width: 100%;
+            height: 100%;
         }
     </style>
 </head>
@@ -188,76 +160,52 @@
         const GAS_JSONP_URL = "https://script.google.com/macros/s/AKfycbyLQ2achxsI5EL8HXtFJGUlB0yeQeaSCGcgu6OD74eMFVGYUpuUard90yRey6I15BYX/exec";
         const statusText = document.getElementById("status");
         const canvas = document.getElementById("wordcloud-canvas");
-        const ctx = canvas.getContext("2d", { alpha: true });
+        const ctx = canvas.getContext("2d");
         const canvasWrapper = document.getElementById("canvas-wrapper");
         
         let currentWords = null;
         let width, height;
-        let resizeTimeout = null;
 
         const wordColors = [
             '#ff6b6b', '#ff9f43', '#feca57', '#ffeaa7', '#55efc4',
             '#81ecec', '#74b9ff', '#a29bfe', '#dfe6e9', '#00cec9'
         ].map(color => ({
             fill: color,
-            stroke: 'rgba(255, 255, 255, 0.9)'
+            stroke: 'rgba(255, 255, 255, 0.7)' // Прозрачный белый контур
         }));
-        
-        const floatRange = 8;
-        const animationDuration = 1200;
-        const shadowBlur = 6;
-        const MAX_WORDS = 80;
 
-        function resizeCanvas() {
-            if (resizeTimeout) {
-                clearTimeout(resizeTimeout);
+        const floatRange = 5;
+        const animationDuration = 1000;
+        const MAX_WORDS = 60; 
+
+        // Использование ResizeObserver для надёжного определения размеров
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                const newWidth = entry.contentRect.width;
+                const newHeight = entry.contentRect.height;
+                
+                if (width !== newWidth || height !== newHeight) {
+                    width = newWidth;
+                    height = newHeight;
+                    const dpr = window.devicePixelRatio || 1;
+                    
+                    canvas.width = width * dpr;
+                    canvas.height = height * dpr;
+                    canvas.style.width = width + 'px';
+                    canvas.style.height = height + 'px';
+                    ctx.scale(dpr, dpr);
+
+                    if (currentWords) {
+                        generateWordCloud(currentWords);
+                    }
+                }
             }
-            
-            resizeTimeout = setTimeout(() => {
-                const newWidth = canvasWrapper.offsetWidth;
-                const newHeight = canvasWrapper.offsetHeight;
-                
-                if (newWidth === 0 || newHeight === 0) return;
-                
-                width = newWidth;
-                height = newHeight;
-                
-                const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-                canvas.width = width * dpr;
-                canvas.height = height * dpr;
-                canvas.style.width = width + 'px';
-                canvas.style.height = height + 'px';
-                
-                ctx.scale(dpr, dpr);
-                
-                // Показываем статус только если нет слов
-                if (!currentWords) {
-                    statusText.style.opacity = 1;
-                }
-                
-                if (currentWords) {
-                    generateWordCloud(currentWords);
-                }
-            }, 50);
-        }
+        });
 
-        // Инициализация размеров при загрузке
-        function initializeCanvas() {
-            resizeCanvas();
-            // Принудительный вызов ресайза для немедленного отображения
-            setTimeout(resizeCanvas, 100);
-        }
-
-        if ('ResizeObserver' in window) {
-            const resizeObserver = new ResizeObserver(initializeCanvas);
-            resizeObserver.observe(canvasWrapper);
-        } else {
-            window.addEventListener("resize", initializeCanvas);
-        }
-
-        const refreshBtn = document.getElementById("refresh");
-        refreshBtn.addEventListener("click", loadFromGoogleSheets, { passive: true });
-
+        // Отслеживаем изменения размеров обертки
+        resizeObserver.observe(canvasWrapper);
+        
+        // Загрузка данных
         function loadFromGoogleSheets() {
             statusText.style.opacity = 1;
             statusText.textContent = "Загрузка данных...";
@@ -279,8 +227,6 @@
         }
 
         function handleData(data) {
-            const now = Date.now();
-            
             if (!data || data.length === 0) {
                 statusText.textContent = "Пока нет ответов. Будьте первым!";
                 return;
@@ -304,27 +250,26 @@
                 }
 
                 currentWords = words;
+                generateWordCloud(words);
                 
-                // Принудительный ресайз для отображения
-                resizeCanvas();
-                
-                // Скрываем статус после успешной загрузки
                 setTimeout(() => {
                     statusText.style.opacity = 0;
-                }, 1500);
+                }, 1000);
                 
-                statusText.textContent = `Показано ${Math.min(words.length, MAX_WORDS)} слов.`;
+                statusText.textContent = `Показано ${words.length} слов.`;
             } catch (err) {
                 console.error("Ошибка обработки:", err);
                 statusText.textContent = "Ошибка анализа текста.";
             }
         }
 
+        // Фильтрация слов
         const stopWordsSet = new Set([
             'и', 'в', 'на', 'с', 'к', 'у', 'по', 'но', 'а', 'я', 'мы', 'вы', 'он', 'она', 'они',
             'это', 'тот', 'так', 'как', 'же', 'ли', 'бы', 'что', 'который', 'если', 'или',
             'все', 'весь', 'этот', 'для', 'быть', 'его', 'ее', 'их', 'мне', 'меня', 'тебя',
-            'чем', 'кто', 'где', 'когда', 'почему', 'зачем', 'потому', 'свои', 'свой', 'свою'
+            'чем', 'кто', 'где', 'когда', 'почему', 'зачем', 'потому', 'свои', 'свой', 'свою',
+            'свой', 'свои', 'патриотизм'
         ]);
 
         function extractWords(text) {
@@ -351,17 +296,14 @@
             entries.sort((a, b) => b[1] - a[1]);
 
             const maxFreq = entries[0][1];
-            const top3Words = new Set(entries.slice(0, 3).map(([text]) => text));
             
-            const minSize = 20;
-            const maxSize = 80;
+            const minSize = 16;
+            const maxSize = 60;
             const sizeDiff = maxSize - minSize;
 
             return entries.slice(0, MAX_WORDS).map(([text, count]) => ({
                 text: text.charAt(0).toUpperCase() + text.slice(1),
-                size: top3Words.has(text) ? 
-                    minSize + sizeDiff * (count / maxFreq) * 1.3 : 
-                    minSize + sizeDiff * (count / maxFreq),
+                size: minSize + sizeDiff * (count / maxFreq),
                 frequency: count,
                 colorIndex: Math.floor(Math.random() * wordColors.length)
             }));
@@ -377,43 +319,37 @@
             }
             
             animatedWords.length = 0;
+            ctx.clearRect(0, 0, width, height);
 
-            // Проверка размеров перед генерацией
-            if (!width || !height) {
-                setTimeout(() => generateWordCloud(words), 100);
+            if (width < 10 || height < 10) {
                 return;
             }
 
             d3.layout.cloud()
                 .size([width, height])
                 .words(words)
-                .padding(3) // Увеличил padding для лучшей читаемости на мобильных
+                .padding(4)
                 .rotate(() => 0)
-                .font("'Open Sans', sans-serif")
+                .font("'Montserrat', sans-serif")
                 .fontSize(d => d.size)
                 .spiral('rectangular')
-                .on("end", (newWords) => {
-                    const now = performance.now();
-                    
-                    newWords.forEach(word => {
-                        word.initialX = word.x;
-                        word.initialY = word.y;
-                        word.animationOffset = Math.random() * Math.PI * 2;
-                        word.colorIndex = Math.floor(Math.random() * wordColors.length);
-                    });
-                    
-                    animatedWords.push(...newWords);
-                    startAnimation(true);
-                })
+                .on("end", draw)
                 .start();
+
+            function draw(newWords) {
+                newWords.forEach(word => {
+                    word.initialX = word.x;
+                    word.initialY = word.y;
+                    word.animationOffset = Math.random() * Math.PI * 2;
+                });
+                
+                animatedWords.push(...newWords);
+                startAnimation();
+            }
         }
 
-        function startAnimation(isInitial = false) {
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-            }
-            
-            const startTime = isInitial ? performance.now() : 0;
+        function startAnimation() {
+            const startTime = performance.now();
             
             function animate(now) {
                 if (!width || !height) {
@@ -426,9 +362,11 @@
                 ctx.translate(width / 2, height / 2);
 
                 const elapsedTime = now - startTime;
-                const progress = isInitial ? Math.min(elapsedTime / animationDuration, 1) : 1;
+                const progress = Math.min(elapsedTime / animationDuration, 1);
                 
-                const easeProgress = d3.easeCubicInOut(progress);
+                const easeProgress = progress < 0.5 
+                    ? 2 * progress * progress 
+                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
                 const timeFactor = now / 2000;
                 
@@ -443,40 +381,84 @@
                     ctx.fillStyle = color.fill;
                     ctx.strokeStyle = color.stroke;
                     ctx.lineWidth = 1;
-                    ctx.font = `${currentSize}px 'Open Sans', sans-serif`;
+
+                    ctx.font = `${currentSize}px 'Montserrat', sans-serif`;
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
                     
-                    ctx.shadowBlur = shadowBlur * easeProgress;
-                    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                    ctx.shadowBlur = 4 * easeProgress;
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
                     
                     ctx.save();
                     ctx.translate(word.initialX + xOffset, word.initialY + yOffset);
                     
-                    ctx.strokeText(word.text.toUpperCase(), 0, 0);
-                    ctx.fillText(word.text.toUpperCase(), 0, 0);
+                    ctx.strokeText(word.text, 0, 0);
+                    ctx.fillText(word.text, 0, 0);
                     
                     ctx.restore();
                 });
                 
                 ctx.restore();
                 
-                animationFrameId = requestAnimationFrame(animate);
+                if (progress < 1) {
+                    animationFrameId = requestAnimationFrame(animate);
+                } else {
+                    animationFrameId = requestAnimationFrame(floatAnimation);
+                }
+            }
+            
+            function floatAnimation(now) {
+                if (!width || !height) {
+                    animationFrameId = requestAnimationFrame(floatAnimation);
+                    return;
+                }
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.save();
+                ctx.translate(width / 2, height / 2);
+
+                const timeFactor = now / 2000;
+                
+                animatedWords.forEach((word) => {
+                    const t = timeFactor + word.animationOffset;
+                    const xOffset = Math.sin(t) * floatRange;
+                    const yOffset = Math.cos(t) * floatRange;
+
+                    const color = wordColors[word.colorIndex];
+                    ctx.fillStyle = color.fill;
+                    ctx.strokeStyle = color.stroke;
+                    ctx.lineWidth = 1;
+                    
+                    ctx.font = `${word.size}px 'Montserrat', sans-serif`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    
+                    ctx.shadowBlur = 4;
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                    
+                    ctx.save();
+                    ctx.translate(word.initialX + xOffset, word.initialY + yOffset);
+                    
+                    ctx.strokeText(word.text, 0, 0);
+                    ctx.fillText(word.text, 0, 0);
+                    
+                    ctx.restore();
+                });
+                
+                ctx.restore();
+                animationFrameId = requestAnimationFrame(floatAnimation);
             }
             
             animationFrameId = requestAnimationFrame(animate);
         }
 
-        function init() {
-            initializeCanvas();
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', () => {
             loadFromGoogleSheets();
-        }
+        });
 
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
-        } else {
-            init();
-        }
+        // Обработчик кнопки
+        document.getElementById("refresh").addEventListener("click", loadFromGoogleSheets);
 
         window.addEventListener('beforeunload', () => {
             if (animationFrameId) {
